@@ -6,7 +6,8 @@ import os
 import zipfile
 import subprocess
 
-playbook_file = 'Files/pb_mapping_iteration2 1.csv'
+#playbook_file = 'Files/pb_mapping_iteration2 1.csv'
+playbook_file = 'Files/Playbook_D3FEND_Mapped_2025_COSE.csv'
 mitre_attack_file = 'Files/enterprise-attack-15.1.json'
 
 
@@ -24,7 +25,7 @@ def call_api(url):
     api_data = requests.get(url).json()
     api_data = json.dumps(api_data)
 
-    # JSON-String to Python objekt
+    # JSON-String to Python object
     data = json.loads(api_data)
     return data
 
@@ -101,22 +102,36 @@ def download_cve_kaggle_data():
     attack_df.head(10)
     return attack_df
 
+
 def get_CVE_data():
-    #cve_file = 'Files/kaggle_dataset/results.csv'
-    #df = pd.read_csv(cve_file)
+    #cve_file = 'Files/kaggle_dataset/results_old.csv'
+    cve_file = 'Files/kaggle_dataset/cve_attack_mapping.csv'
+    df = pd.read_csv(cve_file)
 
-    df = download_cve_kaggle_data()
+    #df = download_cve_kaggle_data()
 
-    df_filtered = df[df['confidence'] > 0.175]
+    initial_count = df['cve_id'].nunique()
+    print(f"initial: {initial_count}")
 
     # Filter descriptions starting with 'Rejected'
-    df_filtered = df_filtered[~df_filtered['description'].str.startswith('Rejected')]
+    df_filtered = df[~df['description'].str.startswith('Rejected')]
+
+    after_rejected_count = df_filtered['cve_id'].nunique()
+    print(f"After rejected: {after_rejected_count}")
+
+    diff_rejected = initial_count - after_rejected_count
+    print(f"count rejected: {diff_rejected}")
+
+    df_filtered = df_filtered[df_filtered['confidence'] > 0.175]
 
     cve_count = df_filtered['cve_id'].nunique()
-    #print(f"Anzahl CVEs: {cve_count}")
+    print(f"Anzahl CVEs: {cve_count}")
+
+    vulnerability_percentage = cve_count / after_rejected_count
+    print(f"vulnerability percentge covered: {vulnerability_percentage}")
 
     attack_technique_count = len(df_filtered)
-    #print(f"Count Attack Techniques: {attack_technique_count}")
+    print(f"Count Attack Techniques: {attack_technique_count}")
 
     df_sorted = df_filtered.sort_values(by='cve_id')
 
@@ -127,12 +142,25 @@ def read_playbooks():
     df_playbooks = pd.read_csv(playbook_file)
 
     # First split the column into two
-    df_playbooks[['Name', 'Techniques']] = df_playbooks['Playbook'].str.split('; ', expand=True)
+    #df_playbooks[['Name', 'Techniques']] = df_playbooks['Playbook'].str.split('; ', expand=True)
 
     # The 'Techniques' column contains strings that look like lists, so we convert them into real lists
-    df_playbooks['Techniques'] = df_playbooks['Techniques'].apply(ast.literal_eval)
+    df_playbooks['techniques'] = df_playbooks['techniques'].apply(ast.literal_eval)
 
     return df_playbooks
 
 
+def read_playbooks_old():
+    df_playbooks = pd.read_csv(playbook_file)
 
+    # First split the column into two
+    df_playbooks[['Name', 'techniques']] = df_playbooks['Playbook'].str.split('; ', expand=True)
+
+    # The 'Techniques' column contains strings that look like lists, so we convert them into real lists
+    df_playbooks['techniques'] = df_playbooks['techniques'].apply(ast.literal_eval)
+
+    print(df_playbooks)
+
+    return df_playbooks
+
+#get_CVE_data()

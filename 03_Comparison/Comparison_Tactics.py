@@ -4,9 +4,9 @@ import Comparison_Helper as helper
 import requests
 import json
 import Graphics as graphics
+from collections import Counter
 
-
-df_coverage = pd.read_csv("Files/results_complete_v17.csv")
+df_coverage = pd.read_csv("Files/results_complete_v17_COSE.csv")
 list_ATTACK_tactics = ["reconnaissance", "resource-development", "initial-access", "execution", "persistence", "privilege-escalation", "defense-evasion", "credential-access", "discovery", "lateral-movement", "collection", "command-and-control", "exfiltration", "impact"]
 list_ATTACK_tactics_upper_case = ["Reconnaissance", "Resource Development", "Initial Access", "Execution", "Persistence", "Privilege Escalation", "Defense Evasion", "Credential Access", "Discovery", "Lateral Movement", "Collection", "Command And Control", "Exfiltration", "Impact"]
 list_D3fend_tactics = ["Model", "Harden", "Detect", "Isolate", "Deceive", "Evict", "Restore"]
@@ -116,6 +116,8 @@ def calculate_cve_side():
         counter_techs += 1
         print(f"Tech: {counter_techs}")
 
+    add_cve_side(set_d3fend_tactics, set_attack_tactics)
+
     total_sum_target_d3fend = sum(dict_d3fend_target.values())
     total_sum_current_attack = sum(dict_attack_current.values())
 
@@ -205,24 +207,38 @@ def add_playbook_side(set_d3fend_tactics, set_attack_tactics):
         dict_attack_target[tactic] += 1
 
 
+
+upper_techniques = ['AssetInventory','NetworkMapping','OperationalActivityMapping','SystemMapping','AgentAuthentication',
+                    'ApplicationHardening','CredentialHardening','MessageHardening','PlatformHardening','SourceCodeHardening','FileRemoval',
+                    'FileAnalysis','IdentifierAnalysis','MessageAnalysis','NetworkTrafficAnalysis','PlatformMonitoring','PlattformMonitoring',
+                   'ProcessAnalysis','ProcessAnalysis','UserBehaviorAnalysis','AccessMediation','AccessPolicyAdministration','ExecutionIsolation',
+                    'NetworkIsolation','DecoyEnvironment','DecoyObject','ProcessEviction','RestoreAccess','RestoreObject','CredentialEviction','ObjectEviction']
+
+list_evict = []
+
 def calculate_playbook_side():
     df_playbooks = helper.read_playbooks()
 
     counter = 0
     for playbook in df_playbooks.itertuples(index=False):
-        print(playbook.Name)
+        print(playbook.playbook_id)
         counter += 1
         print(counter)
 
-        list_used_d3fend_techs = playbook.Techniques
+        list_used_d3fend_techs = playbook.techniques
 
         set_d3fend_tactics = set()
         set_attack_tactics = set()
         for d3fend_tech in list_used_d3fend_techs:
 
+            if d3fend_tech in upper_techniques:
+                continue
+
             d3fend_tactic = get_d3fend_tactics(d3fend_tech)
             if d3fend_tactic is not None and d3fend_tactic != '':
                 set_d3fend_tactics.add(d3fend_tactic)
+                #if d3fend_tactic == "Evict":
+                #    list_evict.append(d3fend_tech)
 
             dict_d3fend_to_attack = get_attack_tactics(d3fend_tech)
             for key, value in dict_d3fend_to_attack.items():
@@ -251,17 +267,22 @@ def calculate_playbook_side():
         percentage_attack = round(percentage_attack * 100, 2)
         list_target_attack_percentages.append(percentage_attack)
 
+    #counter = Counter(list_evict)
+    #for key, value in counter.items():
+        #print(f"{key}: {value}")
+
+
 
 with open("Files/d3fend_to_attack_v17.json", "r") as file:
     list_d3fend_to_attack_mapping = json.load(file)
 
-calculate_playbook_side()
+#calculate_playbook_side()
 
-with open("Files/d3fend_to_attack_v17.json", "w") as file:
-   json.dump(list_d3fend_to_attack_mapping, file)
+#with open("Files/d3fend_to_attack_v17.json", "w") as file:
+#   json.dump(list_d3fend_to_attack_mapping, file)
 
 
-calculate_cve_side()
+#calculate_cve_side()
 
 
 #with open("Files/percentage_attack_current_v17.json", "r") as file:
@@ -277,21 +298,21 @@ calculate_cve_side()
 #    list_target_d3fend_percentages = json.load(file)
 
 
-graphics.genereateFigureAttackTactics(list_current_attack_percentages, list_target_attack_percentages)
-graphics.genereateFigureD3fendTactics(list_current_d3fend_percentages, list_target_d3fend_percentages)
+#graphics.genereateFigureAttackTactics(list_current_attack_percentages, list_target_attack_percentages)
+#graphics.genereateFigureD3fendTactics(list_current_d3fend_percentages, list_target_d3fend_percentages)
 
 
-#with open("Files/percentage_attack_current_v17.json", "w") as file:
-#    json.dump(list_current_attack, file)
+#with open("Files/percentage_attack_current_v17_COSE.json", "w") as file:
+#    json.dump(list_current_attack_percentages, file)
 
-#with open("Files/percentage_attack_target_v17.json", "w") as file:
-#    json.dump(list_target_attack, file)
+#with open("Files/percentage_attack_target_v17_COSE.json", "w") as file:
+#    json.dump(list_target_attack_percentages, file)
 
-#with open("Files/percentage_d3fend_current_v17.json", "w") as file:
-#    json.dump(list_current_d3fend, file)
+#with open("Files/percentage_d3fend_current_v17_COSE.json", "w") as file:
+#    json.dump(list_current_d3fend_percentages, file)
 
-#with open("Files/percentage_d3fend_target_v17.json", "w") as file:
-#     json.dump(list_target_d3fend, file)
+#with open("Files/percentage_d3fend_target_v17_COSE.json", "w") as file:
+#    json.dump(list_target_d3fend_percentages, file)
 
 
 

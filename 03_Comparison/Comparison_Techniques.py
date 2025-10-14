@@ -1,6 +1,7 @@
 import pandas as pd
 import Comparison_Helper as comp_helper
-
+import json
+import copy
 
 def read_comparison_data(data):
     # Iterate "bindings" arrays
@@ -56,19 +57,45 @@ def read_def_tech(binding, tac_tech_dict, tactic, artifact_tech_dict, artifact):
 
         tech = tech.replace(' ', '')
 
-        if tech == "DefensiveTechnique":
-            tech = binding["def_tech_label"]["value"]
-            tac_tech_dict[tactic].update(dict_level2_techs[tech])
-            artifact_tech_dict[artifact].update(dict_level2_techs[tech])
-        else:
-            tac_tech_dict[tactic].add(tech)
-            artifact_tech_dict[artifact].add(tech)
+        if not is_d3fend_api_v_1(tech):
+            if tech == "DefensiveTechnique":
+                tech = binding["def_tech_label"]["value"]
+                if tech == "Decoy Environment" or tech == "File Analysis":
+                    tac_tech_dict[tactic].update(dict_level2_techs[tech])
+                    artifact_tech_dict[artifact].update(dict_level2_techs[tech])
+            else:
+                tac_tech_dict[tactic].add(tech)
+                artifact_tech_dict[artifact].add(tech)
+
+
+def is_d3fend_api_v_1(technique):
+    techniques_v_1 = ["CredentialScrubbing", "IntegerRangeValidation", "PointerValidation", "ReferenceNullification", "TrustedLibrary", "VariableInitialization", "VariableTypeValidation", "NetworkAccessMediation", "NetworkResourceAccessMediation", "PhysicalAccessMediation", "SystemCallFiltering", "Application-basedProcessIsolation"]
+    if technique in techniques_v_1:
+        print(f"V_1 Technique: {technique}")
+        return True
+    else:
+        return False
 
 
 def is_technique_covered_by_playbooks(technique):
     if technique not in defend_techs_covered:
-        defend_techs_covered[technique] = df_playbooks['Techniques'].apply(lambda x: technique in x).any()
+        defend_techs_covered[technique] = df_playbooks['techniques'].apply(lambda x: technique in x).any()
     return defend_techs_covered[technique]
+
+
+def get_d3fend_for_attack_technique(attack_technique):
+    for entry in list_attack_to_d3fend:
+        if entry["Attack_id"] == attack_technique:
+            entry_copy = copy.deepcopy(entry)
+
+            entry_copy.pop("Attack_id", None)
+
+            for key in list(entry_copy.keys()):
+                if entry_copy[key] == []:
+                    del entry_copy[key]
+
+            return entry_copy
+
 
 
 list_attack_techs = comp_helper.get_mitre_attack_techs()
@@ -88,22 +115,32 @@ dict_level2_techs = {
 # Tech Lists for Top X:
 list_top10 = ["T1203", "T1499", "T1190", "T1059", "T1498", "T1548", "T1068", "T1505", "T1027", "T1083"]
 list_top15 = ["T1203", "T1499", "T1190", "T1059", "T1498", "T1548", "T1068", "T1505", "T1027", "T1083", "T1070", "T1204", "T1071", "T1105", "T1553"]
-list_top20 = ["T1203", "T1499", "T1190", "T1059", "T1498", "T1548", "T1068", "T1505", "T1027", "T1083", "T1070", "T1204", "T1071", "T1105", "T1553", "T1556", "T1055", "T1562", "T1033", "T1550", "T1574"]
+list_top20 = ["T1203", "T1499", "T1190", "T1059", "T1548", "T1068", "T1505", "T1027", "T1083", "T1070", "T1204", "T1071", "T1105", "T1553", "T1556", "T1055", "T1562", "T1033", "T1550", "T1498"]
+#, "T1574"
+#, "T1498"
 
 df_playbooks = comp_helper.read_playbooks()
 
+# Read attack_defend_dict from json file
+with open("Files/attack_to_defend_v17.json", "r", encoding="utf-8") as f:
+    list_attack_to_d3fend = json.load(f)
+
+#dict_attack_to_d3fend = {}
 
 for attack_tech in list_attack_techs:
 
-    #if attack_tech["attack_id"] not in list_top20:
-    #    continue
+    if attack_tech["attack_id"] not in list_top20:
+        continue
 
     #if attack_tech["attack_id"] != "T1553":
     #    continue
 
-    api_url_attack = "https://d3fend.mitre.org/api/offensive-technique/attack/" + attack_tech["attack_id"] + ".json"
-    api_data = comp_helper.call_api(api_url_attack)
-    dict_defend = read_comparison_data(api_data)
+    #api_url_attack = "https://d3fend.mitre.org/api/offensive-technique/attack/" + attack_tech["attack_id"] + ".json"
+    #api_data = comp_helper.call_api(api_url_attack)
+    #dict_defend = read_comparison_data(api_data)
+    #dict_attack_to_d3fend[attack_tech["attack_id"]] = dict_defend
+
+    dict_defend = get_d3fend_for_attack_technique(attack_tech["attack_id"])
 
     total_techs = 0
     total_techs_covered = 0
@@ -112,7 +149,7 @@ for attack_tech in list_attack_techs:
     df_results.at[next_index, "Attack_id"] = attack_tech["attack_id"]
     df_results.at[next_index, "Attack_tactics"] = attack_tech["tactics"]
 
-    for tactic, set_techs in dict_defend["dict_tac_tech"].items():
+    for tactic, set_techs in dict_defend.items():
 
         list_covered_techs = []
         for technique in set_techs:
@@ -136,7 +173,7 @@ for attack_tech in list_attack_techs:
 
 # ------------------------------------------------------------
 # Artifacts Coverage
-
+"""
     list_missing_artifacts = []
     count_covered_artifacts = 0
     counter_irrelevant_artifacts = 0
@@ -162,14 +199,13 @@ for attack_tech in list_attack_techs:
             coverage_in_artifacts = 1 - (len(list_missing_artifacts) / count_relevant_artifacts)
             df_results.at[next_index, "Artifact"] = coverage_in_artifacts
             df_results.at[next_index, "Artifact_missing"] = list_missing_artifacts
-
+"""
 
 pd.set_option("display.max_columns", None)
 print(df_results)
 
-df_results.to_csv("Files/results_v17.csv", index=False)
-
-
+#df_results.to_csv("Files/results_top20_v17_new.csv", index=False)
+#df_results.to_csv("Files/results_complete_v17_COSE.csv", index=False)
 
 
 
